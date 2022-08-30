@@ -1,3 +1,5 @@
+use rand::random;
+
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
 
@@ -32,7 +34,7 @@ pub struct Emulator {
     ram: [u8; RAM_SIZE],
     screen: [bool; SCREEN_WIDTH * SCREEN_HEIGHT],
     v_reg: [u8; REGISTER_COUNT],
-    i_register: u16,
+    i_reg: u16,
     stack_ptr: u16,
     stack: [u16; STACK_SIZE],
     keys: [bool; NUM_KEYS],
@@ -47,7 +49,7 @@ impl Default for Emulator {
             ram: [0; RAM_SIZE],
             screen: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
             v_reg: [0; REGISTER_COUNT],
-            i_register: 0,
+            i_reg: 0,
             stack_ptr: 0,
             stack: [0; STACK_SIZE],
             keys: [false; NUM_KEYS],
@@ -69,7 +71,7 @@ impl Emulator {
         self.ram = [0; RAM_SIZE];
         self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
         self.v_reg = [0; REGISTER_COUNT];
-        self.i_register = 0;
+        self.i_reg = 0;
         self.stack_ptr = 0;
         self.stack = [0; STACK_SIZE];
         self.keys = [false; NUM_KEYS];
@@ -267,6 +269,22 @@ impl Emulator {
         }
     }
 
+    fn assign_nnn_to_ireg(&mut self, nnn: u16) {
+        self.i_reg = nnn
+    }
+
+    fn jump_to_offset(&mut self, nnn: u16) {
+        self.pc = (self.v_reg[0] as u16) + nnn;
+    }
+
+    fn assign_rand_and_nn_to_vx(&mut self, second_digit: u16, nn: u16) {
+        let x = second_digit as usize; 
+        let nn = nn as u8;
+        let rng: u8 = random();
+
+        self.v_reg[x] = rng & nn;
+    }
+
     fn execute(&mut self, op: u16) {
         let first_digit = (op & 0xF000) >> 12;
         let second_digit = (op & 0x0F00) >> 8;
@@ -282,9 +300,9 @@ impl Emulator {
             (0, 0, 0xE, 0xE) => self.end_subroutine(), // RET
             (1, _, _, _) => self.jump(nnn), // JMP
             (2, _, _, _) => self.call_subroutine(nnn), // CALL
-            (3, _, _, _) => self.skip_if_vx_equals_nn(second_digit, nn), // SKIP VX == NN
-            (4, _, _, _) => self.skip_if_vx_not_equals_nn(second_digit, nn), // SKIP VX != NN
-            (5, _, _, 0) => self.skip_if_vx_equals_vy(second_digit, third_digit), // SKIP VX == VY
+            (3, _, _, _) => self.skip_if_vx_equals_nn(second_digit, nn), // SE VX, NN
+            (4, _, _, _) => self.skip_if_vx_not_equals_nn(second_digit, nn), // SNE VX, NN
+            (5, _, _, 0) => self.skip_if_vx_equals_vy(second_digit, third_digit), // SE VX, VY
             (6, _, _, _) => self.assign_nn_to_vx(second_digit, nn), // VX == NN
             (7, _, _, _) => self.add_nn_to_vx(second_digit, nn), // VX += NN
             (8, _, _, 0) => self.assign_vx_to_vy(second_digit, third_digit), // VX = VY
@@ -296,7 +314,10 @@ impl Emulator {
             (8, _, _, 6) => self.rshift_vx(second_digit), // VX >>= 1
             (8, _, _, 7) => self.sub_vx_from_vy(second_digit, third_digit), // VX = VY - VX
             (8, _, _, 0xE) => self.lshift_vx(second_digit), // VX <<= 1
-            (9, _, _, 0) => self.skip_if_vx_not_equals_vy(second_digit, third_digit),
+            (9, _, _, 0) => self.skip_if_vx_not_equals_vy(second_digit, third_digit), // SNE VX, VY
+            (0xA, _, _, _) => self.assign_nnn_to_ireg(nnn), // I = NNN
+            (0xB, _, _, _) => self.jump_to_offset(nnn), // JMP V0 + NNN
+            (0xC, _, _, _) => self.assign_rand_and_nn_to_vx(second_digit, nn), // VX = RAND & NN
             _ => unimplemented!("Unimplemented opcode: {}", op),
         }
     }
