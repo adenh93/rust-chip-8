@@ -285,6 +285,86 @@ impl Emulator {
         self.v_reg[x] = rng & nn;
     }
 
+    fn draw_sprite(&mut self, vx: u16, vy: u16, num_rows: u16) {
+        let x_coord = self.v_reg[vx as usize] as u16;
+        let y_coord = self.v_reg[vy as usize] as u16;
+        
+        let mut flipped = false;
+
+        for y_line in 0..num_rows {
+            let addr = self.i_reg + y_line as u16;
+            let pixels = self.ram[addr as usize];
+
+            for x_line in 0..8 {
+                if (pixels & (0b10000000 >> x_line)) != 0 {
+                    let x = (x_coord + x_line) as usize % SCREEN_WIDTH;
+                    let y = (y_coord + y_line) as usize & SCREEN_HEIGHT;
+
+                    let idx = x + SCREEN_WIDTH * y;
+                    flipped |= self.screen[idx];
+                    self.screen[idx] ^= true;
+                }
+            }
+        }
+
+        self.v_reg[0xF] = flipped.into()
+    }
+
+    fn skip_if_key_pressed(&mut self, x: u16) {
+        let vx = self.v_reg[x as usize];
+        let key = self.keys[vx as usize];
+
+        if key {
+            self.pc += 2;
+        }
+    }
+
+    fn skip_if_key_not_pressed(&mut self, x: u16) {
+        let vx = self.v_reg[x as usize];
+        let key = self.keys[vx as usize];
+
+        if !key {
+            self.pc += 2;
+        }
+    }
+
+    fn assign_dt_to_vx(&mut self, x: u16) {
+        let x = x as usize;
+        self.v_reg[x] = self.delay_timer;
+    }
+
+    fn wait_for_key_press(&mut self, x: u16) {
+        let x = x as usize;
+        let mut pressed = false;
+
+        for i in 0..self.keys.len() {
+            if self.keys[i] {
+                self.v_reg[x] = i as u8;
+                pressed = true;
+                break;
+            }
+        }
+
+        if !pressed {
+            self.pc -= 2;
+        }
+    }
+
+    fn assign_vx_to_dt(&mut self, x: u16) {
+        let vx = self.v_reg[x as usize];
+        self.delay_timer = vx;
+    }
+
+    fn assign_vx_to_st(&mut self, x: u16) {
+        let vx = self.v_reg[x as usize];
+        self.sound_timer = vx;
+    }
+
+    fn add_vx_to_ireg(&mut self, x: u16) {
+        let vx = self.v_reg[x as usize] as u16;
+        self.i_reg = self.i_reg.wrapping_add(vx);
+    }
+
     fn execute(&mut self, op: u16) {
         let first_digit = (op & 0xF000) >> 12;
         let second_digit = (op & 0x0F00) >> 8;
@@ -306,7 +386,7 @@ impl Emulator {
             (6, _, _, _) => self.assign_nn_to_vx(second_digit, nn), // VX == NN
             (7, _, _, _) => self.add_nn_to_vx(second_digit, nn), // VX += NN
             (8, _, _, 0) => self.assign_vx_to_vy(second_digit, third_digit), // VX = VY
-            (8, _, _, 1) => self.vx_or_vy(second_digit, third_digit), // VX = VY
+            (8, _, _, 1) => self.vx_or_vy(second_digit, third_digit), // VX |= VY
             (8, _, _, 2) => self.vx_and_vy(second_digit, third_digit), // VX &= VY
             (8, _, _, 3) => self.vx_xor_vy(second_digit, third_digit), // VX ^= VY
             (8, _, _, 4) => self.add_vy_to_vx(second_digit, third_digit), // VX += VY
@@ -318,6 +398,14 @@ impl Emulator {
             (0xA, _, _, _) => self.assign_nnn_to_ireg(nnn), // I = NNN
             (0xB, _, _, _) => self.jump_to_offset(nnn), // JMP V0 + NNN
             (0xC, _, _, _) => self.assign_rand_and_nn_to_vx(second_digit, nn), // VX = RAND & NN
+            (0xD, _, _, _) => self.draw_sprite(second_digit, third_digit, fourth_digit), // DRW
+            (0xE, _, 9, 0xE) => self.skip_if_key_pressed(second_digit), // SKP
+            (0xE, _, 0xA, 1) => self.skip_if_key_not_pressed(second_digit), //SKNP 
+            (0xF, _, 0, 7) => self.assign_dt_to_vx(second_digit), // VX = DT
+            (0xF, _, 0, 0xA) => self.wait_for_key_press(second_digit), // LD VX, K
+            (0xF, _, 1, 5) => self.assign_vx_to_dt(second_digit), // LD DT, VX
+            (0xF, _, 1, 8) => self.assign_vx_to_st(second_digit), // LD ST, VX
+            (0xF, _, 1, 0xE) => self.add_vx_to_ireg(second_digit), // I += VX
             _ => unimplemented!("Unimplemented opcode: {}", op),
         }
     }
