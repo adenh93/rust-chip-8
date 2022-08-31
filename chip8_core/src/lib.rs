@@ -365,6 +365,42 @@ impl Emulator {
         self.i_reg = self.i_reg.wrapping_add(vx);
     }
 
+    fn assign_font_addr_to_ireg(&mut self, x: u16) {
+        let x = x as usize;
+        let c = self.v_reg[x] as u16;
+        self.i_reg = c * 5;
+    }
+
+    fn assign_vx_bcd_to_ireg(&mut self, x: u16) {
+        let vx = self.v_reg[x as usize] as f32;
+
+        let hundreds = (vx / 100.0).floor() as u8;
+        let tens = ((vx / 10.0) % 10.0).floor() as u8;
+        let ones = (vx % 10.0) as u8;
+
+        self.ram[self.i_reg as usize] = hundreds;
+        self.ram[(self.i_reg + 1) as usize] = tens;
+        self.ram[(self.i_reg + 2) as usize] = ones;
+    }
+
+    fn store_regs_into_ram(&mut self, x: u16) {
+        let x = x as usize;
+        let i = self.i_reg as usize;
+
+        for idx in 0..=x {
+            self.ram[i + idx] = self.v_reg[idx];
+        }
+    }
+
+    fn load_ram_into_regs(&mut self, x: u16) {
+        let x = x as usize;
+        let i = self.i_reg as usize;
+
+        for idx in 0..=x {
+            self.v_reg[idx] = self.ram[i + idx];
+        }
+    }
+
     fn execute(&mut self, op: u16) {
         let first_digit = (op & 0xF000) >> 12;
         let second_digit = (op & 0x0F00) >> 8;
@@ -406,6 +442,10 @@ impl Emulator {
             (0xF, _, 1, 5) => self.assign_vx_to_dt(second_digit), // LD DT, VX
             (0xF, _, 1, 8) => self.assign_vx_to_st(second_digit), // LD ST, VX
             (0xF, _, 1, 0xE) => self.add_vx_to_ireg(second_digit), // I += VX
+            (0xF, _, 2, 9) => self.assign_font_addr_to_ireg(second_digit), // LD F, VX 
+            (0xF, _, 3, 3) => self.assign_vx_bcd_to_ireg(second_digit), // LD B, VX
+            (0xF, _, 5, 5) => self.store_regs_into_ram(second_digit), // LD [I], VX
+            (0xF, _, 6, 6) => self.load_ram_into_regs(second_digit), // LD VX, [I]
             _ => unimplemented!("Unimplemented opcode: {}", op),
         }
     }
