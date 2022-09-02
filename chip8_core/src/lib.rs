@@ -11,7 +11,7 @@ const NUM_KEYS: usize = 16;
 const FONTSET_SIZE: usize = 80;
 
 const FONTSET: [u8; FONTSET_SIZE] = [
-    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0 
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
     0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
     0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
@@ -39,7 +39,7 @@ pub struct Emulator {
     stack: [u16; STACK_SIZE],
     keys: [bool; NUM_KEYS],
     delay_timer: u8,
-    sound_timer: u8
+    sound_timer: u8,
 }
 
 impl Default for Emulator {
@@ -54,7 +54,7 @@ impl Default for Emulator {
             stack: [0; STACK_SIZE],
             keys: [false; NUM_KEYS],
             delay_timer: 0,
-            sound_timer: 0
+            sound_timer: 0,
         }
     }
 }
@@ -130,7 +130,7 @@ impl Emulator {
     }
 
     fn pop(&mut self) -> u16 {
-        self.stack_ptr -=1;
+        self.stack_ptr -= 1;
         self.stack[self.stack_ptr as usize]
     }
 
@@ -157,7 +157,7 @@ impl Emulator {
     fn skip_if_vx_equals_nn(&mut self, second_digit: u16, nn: u16) {
         let x = second_digit as usize;
         let nn = nn as u8;
-        
+
         if self.v_reg[x] == nn {
             self.pc += 2;
         }
@@ -293,7 +293,7 @@ impl Emulator {
     }
 
     fn assign_rand_and_nn_to_vx(&mut self, second_digit: u16, nn: u16) {
-        let x = second_digit as usize; 
+        let x = second_digit as usize;
         let nn = nn as u8;
         let rng: u8 = random();
 
@@ -303,7 +303,7 @@ impl Emulator {
     fn draw_sprite(&mut self, vx: u16, vy: u16, num_rows: u16) {
         let x_coord = self.v_reg[vx as usize] as u16;
         let y_coord = self.v_reg[vy as usize] as u16;
-        
+
         let mut flipped = false;
 
         for y_line in 0..num_rows {
@@ -311,9 +311,9 @@ impl Emulator {
             let pixels = self.ram[addr as usize];
 
             for x_line in 0..8 {
-                if (pixels & (0b10000000 >> x_line)) != 0 {
+                if (pixels & (0b1000_0000 >> x_line)) != 0 {
                     let x = (x_coord + x_line) as usize % SCREEN_WIDTH;
-                    let y = (y_coord + y_line) as usize & SCREEN_HEIGHT;
+                    let y = (y_coord + y_line) as usize % SCREEN_HEIGHT;
 
                     let idx = x + SCREEN_WIDTH * y;
                     flipped |= self.screen[idx];
@@ -426,41 +426,41 @@ impl Emulator {
         let nn = op & 0xFF;
 
         match (first_digit, second_digit, third_digit, fourth_digit) {
-            (0, 0, 0, 0) => (), // NOP
-            (0, 0, 0xE, 0) => self.clear_screen(), // CLS
-            (0, 0, 0xE, 0xE) => self.end_subroutine(), // RET
-            (1, _, _, _) => self.jump(nnn), // JMP
-            (2, _, _, _) => self.call_subroutine(nnn), // CALL
-            (3, _, _, _) => self.skip_if_vx_equals_nn(second_digit, nn), // SE VX, NN
-            (4, _, _, _) => self.skip_if_vx_not_equals_nn(second_digit, nn), // SNE VX, NN
-            (5, _, _, 0) => self.skip_if_vx_equals_vy(second_digit, third_digit), // SE VX, VY
-            (6, _, _, _) => self.assign_nn_to_vx(second_digit, nn), // VX == NN
-            (7, _, _, _) => self.add_nn_to_vx(second_digit, nn), // VX += NN
-            (8, _, _, 0) => self.assign_vx_to_vy(second_digit, third_digit), // VX = VY
-            (8, _, _, 1) => self.vx_or_vy(second_digit, third_digit), // VX |= VY
-            (8, _, _, 2) => self.vx_and_vy(second_digit, third_digit), // VX &= VY
-            (8, _, _, 3) => self.vx_xor_vy(second_digit, third_digit), // VX ^= VY
-            (8, _, _, 4) => self.add_vy_to_vx(second_digit, third_digit), // VX += VY
-            (8, _, _, 5) => self.sub_vy_from_vx(second_digit, third_digit), // VX -= VY
-            (8, _, _, 6) => self.rshift_vx(second_digit), // VX >>= 1
+            (0, 0, 0, 0) => (),                                                       // NOP
+            (0, 0, 0xE, 0) => self.clear_screen(),                                    // CLS
+            (0, 0, 0xE, 0xE) => self.end_subroutine(),                                // RET
+            (1, _, _, _) => self.jump(nnn),                                           // JMP
+            (2, _, _, _) => self.call_subroutine(nnn),                                // CALL
+            (3, _, _, _) => self.skip_if_vx_equals_nn(second_digit, nn),              // SE VX, NN
+            (4, _, _, _) => self.skip_if_vx_not_equals_nn(second_digit, nn),          // SNE VX, NN
+            (5, _, _, _) => self.skip_if_vx_equals_vy(second_digit, third_digit),     // SE VX, VY
+            (6, _, _, _) => self.assign_nn_to_vx(second_digit, nn),                   // VX == NN
+            (7, _, _, _) => self.add_nn_to_vx(second_digit, nn),                      // VX += NN
+            (8, _, _, 0) => self.assign_vx_to_vy(second_digit, third_digit),          // VX = VY
+            (8, _, _, 1) => self.vx_or_vy(second_digit, third_digit),                 // VX |= VY
+            (8, _, _, 2) => self.vx_and_vy(second_digit, third_digit),                // VX &= VY
+            (8, _, _, 3) => self.vx_xor_vy(second_digit, third_digit),                // VX ^= VY
+            (8, _, _, 4) => self.add_vy_to_vx(second_digit, third_digit),             // VX += VY
+            (8, _, _, 5) => self.sub_vy_from_vx(second_digit, third_digit),           // VX -= VY
+            (8, _, _, 6) => self.rshift_vx(second_digit),                             // VX >>= 1
             (8, _, _, 7) => self.sub_vx_from_vy(second_digit, third_digit), // VX = VY - VX
-            (8, _, _, 0xE) => self.lshift_vx(second_digit), // VX <<= 1
+            (8, _, _, 0xE) => self.lshift_vx(second_digit),                 // VX <<= 1
             (9, _, _, 0) => self.skip_if_vx_not_equals_vy(second_digit, third_digit), // SNE VX, VY
-            (0xA, _, _, _) => self.assign_nnn_to_ireg(nnn), // I = NNN
-            (0xB, _, _, _) => self.jump_to_offset(nnn), // JMP V0 + NNN
+            (0xA, _, _, _) => self.assign_nnn_to_ireg(nnn),                 // I = NNN
+            (0xB, _, _, _) => self.jump_to_offset(nnn),                     // JMP V0 + NNN
             (0xC, _, _, _) => self.assign_rand_and_nn_to_vx(second_digit, nn), // VX = RAND & NN
             (0xD, _, _, _) => self.draw_sprite(second_digit, third_digit, fourth_digit), // DRW
-            (0xE, _, 9, 0xE) => self.skip_if_key_pressed(second_digit), // SKP
-            (0xE, _, 0xA, 1) => self.skip_if_key_not_pressed(second_digit), //SKNP 
-            (0xF, _, 0, 7) => self.assign_dt_to_vx(second_digit), // VX = DT
-            (0xF, _, 0, 0xA) => self.wait_for_key_press(second_digit), // LD VX, K
-            (0xF, _, 1, 5) => self.assign_vx_to_dt(second_digit), // LD DT, VX
-            (0xF, _, 1, 8) => self.assign_vx_to_st(second_digit), // LD ST, VX
-            (0xF, _, 1, 0xE) => self.add_vx_to_ireg(second_digit), // I += VX
-            (0xF, _, 2, 9) => self.assign_font_addr_to_ireg(second_digit), // LD F, VX 
-            (0xF, _, 3, 3) => self.assign_vx_bcd_to_ireg(second_digit), // LD B, VX
-            (0xF, _, 5, 5) => self.store_regs_into_ram(second_digit), // LD [I], VX
-            (0xF, _, 6, 6) => self.load_ram_into_regs(second_digit), // LD VX, [I]
+            (0xE, _, 9, 0xE) => self.skip_if_key_pressed(second_digit),     // SKP
+            (0xE, _, 0xA, 1) => self.skip_if_key_not_pressed(second_digit), //SKNP
+            (0xF, _, 0, 7) => self.assign_dt_to_vx(second_digit),           // VX = DT
+            (0xF, _, 0, 0xA) => self.wait_for_key_press(second_digit),      // LD VX, K
+            (0xF, _, 1, 5) => self.assign_vx_to_dt(second_digit),           // LD DT, VX
+            (0xF, _, 1, 8) => self.assign_vx_to_st(second_digit),           // LD ST, VX
+            (0xF, _, 1, 0xE) => self.add_vx_to_ireg(second_digit),          // I += VX
+            (0xF, _, 2, 9) => self.assign_font_addr_to_ireg(second_digit),  // LD F, VX
+            (0xF, _, 3, 3) => self.assign_vx_bcd_to_ireg(second_digit),     // LD B, VX
+            (0xF, _, 5, 5) => self.store_regs_into_ram(second_digit),       // LD [I], VX
+            (0xF, _, 6, 5) => self.load_ram_into_regs(second_digit),        // LD VX, [I]
             _ => unimplemented!("Unimplemented opcode: {}", op),
         }
     }
